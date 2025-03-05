@@ -16,16 +16,159 @@ function shell(command){
 
 import { Jimp } from "jimp";
 import { promises as fs } from "fs";
-import { existsSync } from "fs"
+import { existsSync, readFileSync } from "fs"
+
+function calculateDistance(coord1, coord2) {
+  const { lat: lat1, lon: lon1 } = coord1;
+  const { lat: lat2, lon: lon2 } = coord2;
+
+  const earthRadius = 6371; // Earth's radius in kilometers.
+
+  const lat1Rad = (lat1 * Math.PI) / 180;
+  const lon1Rad = (lon1 * Math.PI) / 180;
+  const lat2Rad = (lat2 * Math.PI) / 180;
+  const lon2Rad = (lon2 * Math.PI) / 180;
+
+  const dLat = lat2Rad - lat1Rad;
+  const dLon = lon2Rad - lon1Rad;
+
+  // Calculation using the haversine formula (the formula is divided into two parts).
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1Rad) *
+      Math.cos(lat2Rad) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  const distance = earthRadius * c;
+    //return distance.toFixed(2); // The distance between two geographic points in kilometers rounded to the hundredths.
+    return distance;
+}
+
+
+function getIndices(lat,lon){
+
+    // https://www.swisstopo.admin.ch/en/coordinates-conversion-navref
+    let oLat=45.806900086; //y  LV03: 73987.5
+    let oLon=5.894943851;  //x  LV03: 479987.5
+    let grid=25.0;         // grid is 25m
+    
+    let dx= 1000.0*calculateDistance( { lat: oLat , lon: oLon }, { lat: oLat, lon: lon }); 
+    let dy= 1000.0*calculateDistance( { lat: oLat , lon: lon }, { lat: lat , lon: lon }); 
+
+    
+    let x = Math.round(dx/grid);
+    let y = dhm.height - Math.round(dy/grid);
+
+    //console.log('latlon: '+lat+' '+lon);
+    return { x: x, y:y }
+}
+
+
+async function makeDhmImage(bbox){
+
+    let upperLeft=getIndices(bbox.north,bbox.west);
+    let lowerRight=getIndices(bbox.south,bbox.east);
+
+    //console.log(upperLeft,lowerRight);
+    
+    let x=upperLeft.x;
+    let y=upperLeft.y;
+    let w=lowerRight.x-x;
+    let h=lowerRight.y-y;
+
+	
+    let options={ width:w, height:h }
+    //console.log(options)
+    let out= new Jimp(options);
+    out.blit({ src: dhm, x:0, y:0, srcX: x, srcY: y, srcW: w, srcH: h})  
+    return out;    
+}
+
+
+async function processGeojson(geo){
+
+    //const width=512;
+    //const height=512;
+    //const zoom=17;
+    
+    let features=geo.features;
+    for(let i=0;i<features.length;i++){
+	const feature=features[i];
+	const id=feature.properties.id;
+	const lat=feature.geometry.coordinates[1];
+	const lon=feature.geometry.coordinates[0];
+	const country=feature.properties.tags['addr:country'];
+
+	if(country=='Schweiz/Suisse/Svizzera/Svizra'){
+            process.stderr.write('.');
+
+	    //const bbox = latLngToBounds(lat, lon, zoom, width, height);
+
+	    let nodepath='./node/'+id+'/';
+            let nodefile;
+	    let image;
+	    let bbox;
+            let width;
+
+	    width=512;
+            bbox=JSON.parse( readFileSync(nodepath+'info-'+width+'.json','utf-8') ).bbox
+	    //console.log(bbox);
+	     nodefile= nodepath+'dhm-'+width+'.png';
+	     if(!existsSync(nodefile)){
+		 image = await makeDhmImage(bbox);
+		  if(image){
+		      //await fs.mkdir(nodepath, { recursive: true } );
+		      await image.write(nodefile);
+		  }
+	     }
+
+	    width=768
+            bbox=JSON.parse( readFileSync(nodepath+'info-'+width+'.json','utf-8') ).bbox
+	    //console.log(bbox);
+	     nodefile= nodepath+'dhm-'+width+'.png';
+	     if(!existsSync(nodefile)){
+		 image = await makeDhmImage(bbox);
+		  if(image){
+		      //await fs.mkdir(nodepath, { recursive: true } );
+		      await image.write(nodefile);
+		  }
+	     }
+	    
+	}
+    }
+}
+
+
+let dhm = await Jimp.read('dhm25.png');
+
+var chunks = '';
+
+process.stdin.on('readable', () => {
+  let chunk;
+  while (null !== (chunk = process.stdin.read())) {
+      chunks+=chunk;
+  }
+});
+
+process.stdin.on('end', () => {
+    processGeojson(JSON.parse(chunks))
+});
 
 
 // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#lon.2Flat_to_tile_numbers_2
 
+/*
 const EARTH_CIR_METERS = 40075016.686;
 const TILE_SIZE = 256
 const degreesPerMeter = 360 / EARTH_CIR_METERS;
 const LIMIT_Y = toDegrees(Math.atan(Math.sinh(Math.PI))) // around 85.0511...
+*/
 
+/*
 function toRadians(degrees) {
   return degrees * Math.PI / 180;
 }
@@ -101,8 +244,8 @@ function latLngToBounds(lat, lng, zoom, width, height){
     east: lng+shiftDegreesEW
   }
 }
-
-
+*/
+/*
 function isBoundInSwitzerland(bbox){
 
     // https://gist.github.com/graydon/11198540
@@ -126,29 +269,9 @@ function isBoundInSwitzerland(bbox){
 	return "false"
     }
 }
-
-/*
-const src = [
-  "https://www.openstreetmap.org/export/embed.html?bbox=",
-  bb.west,
-  ",",
-  bb.south,
-  ",",
-  bb.east,
-  ",",
-  bb.north,
-  "&layer=mapnik&marker=",
-  latitude,
-  ",",
-  longitude,
-].join('');
-
-
-console.log(src);
 */
 
-
-
+/*
 function bboxToTiles(bbox,zoom){
     
     let top=lat2tile(bbox.north,zoom);
@@ -173,14 +296,19 @@ function bboxToTiles(bbox,zoom){
 
     return tiles;
 }
+*/
 
-function latLonToPixel(lat,lon,bbox, zoom){
+
+/*
+function latLonToPixel(bbox, zoom){
 
     let top=lat2tile(bbox.north,zoom);
     let left=lon2tile(bbox.west,zoom);
     let bottom=lat2tile(bbox.south,zoom);
     let right=lon2tile(bbox.east,zoom);
 
+    let lon=(bbox.west+bbox.east)/2.0;
+    let lat=(bbox.north+bbox.south)/2.0;
     let fracX=lon2tileFraction(lon,zoom);
     let fracY=lat2tileFraction(lat,zoom);
 
@@ -189,7 +317,7 @@ function latLonToPixel(lat,lon,bbox, zoom){
     let resX;
     let resY;
 
-    px=0;
+    py=0;
     for(let y=top;y<bottom+1;y++){
 	px=0;
 	for(let x=left;x<right+1;x++){
@@ -206,7 +334,8 @@ function latLonToPixel(lat,lon,bbox, zoom){
 
     return { pixelX: resX, pixelY: resY }
 }
-
+*/
+/*
 function bboxToDimension(bbox,zoom){
 
     let top=lat2tile(bbox.north,zoom);
@@ -221,29 +350,37 @@ function bboxToDimension(bbox,zoom){
 }
     
 
+async function getTile(layer,x,y,z){
+
+
+
+    return tile;
+}
+/*
+/*
 async function downloadLayer(tiledir,layer, bbox,zoom){
 
     let tiles = bboxToTiles(bbox,zoom);
     let switzerland = isBoundInSwitzerland(bbox);
+    let tileImages = [];
 
-    for(let i=0;i<tiles.length;i+=2){
-	
+    for(let i=0;i<tiles.length;i+=2){	
 	let url;
 	let ext;
-
 	let x=tiles[i];
 	let y=tiles[i+1];
 	let z=zoom;
-
-	let prepathOk = false;
-	
 	switch(layer){
 	case 'osm':
 	    url='https://a.tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';
 	    ext='png';
 	    break;
 	case 'slope':
-	    url='https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/'+z+'/'+x+'/'+y+'.png';
+	    if(switzerland=="true" && zoom<=17){
+		url='https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/'+z+'/'+x+'/'+y+'.png';
+	    }else{
+		url='';
+	    }
 	    ext='png';
 	    break;
 	case 'esri':
@@ -254,122 +391,21 @@ async function downloadLayer(tiledir,layer, bbox,zoom){
 	    url=''
 	    break;
 	}
-	
 	let path = tiledir+'/'+layer+'/'+zoom+'/'+x+'/';
 	let file = y+'.'+ext;
-	
-	if(url != '' && !existsSync(path+file) ){
-            await fs.mkdir(path, { recursive: true } );	    
-	    const tile = await Jimp.read(url);
-	    await tile.write(tile, path+file);
+	let tile;
+	if(url!=''){
+	    if(existsSync(path+file) ){ 
+		tile = await Jimp.read(path+file)
+	    }else{
+		console.log(path+file);
+		tile = await Jimp.read(url);
+		await fs.mkdir(path, { recursive: true } );	    
+		await tile.write(path+file);
+	    }
+	    tileImages.push(tile);
 	}
-   
     }
-
-    
-    
-	
-
-    
-}
-
-/*
-function downloadTiles(tiledir, bbox, zoom){
-
-    let tiles=bboxToTiles(bbox,zoom);
-    let switzerland=isBoundInSwitzerland(bbox);
-    
-    let command=process.cwd()+'/download-tiles.sh ';
-    command+=' '+tiledir;
-    command+=' '+switzerland;
-    command+=' '+zoom;
-    for( const item of tiles)command+=' '+item;
-    //console.log(command);
-    shell(command);
-
-}
-
-
-function makeImages(tiledir, id, lat, lon, bbox, zoom){
-
-    let dimension=bboxToDimension(bbox, zoom);
-    let tiles=bboxToTiles(bbox, zoom);
-    let pixel=latLonToPixel(lat,lon,bbox,zoom);
-
-    
-    let command=process.cwd()+'/montage-tiles.sh ';
-    command+=' '+tiledir;
-    command+=' '+id;
-    command+=' '+pixel.pixelX+' '+pixel.pixelY;
-    command+=' '+dimension.dimX+' '+dimension.dimY;
-    command+=' '+zoom;
-    for( const item of tiles)command+=' '+item;
-    
-    //console.log(command);
-    shell(command);
-
+    return tileImages
 }
 */
-
-/*
-// 47.511748, 7.7814914
-// 	47.4928344, 7.6411131
-
-//exampls
-const latitude =  47.4928344 //Number(process.argv[2])
-const longitude = 7.6411131 //Number(process.argv[3])
-const zoom = 17 //process.argv[4]
-const width = 512 //process.argv[5]
-const height = 512 //process.argv[5]
-
-console.log(latitude,longitude);
-
-const bbox = latLngToBounds(latitude,longitude,zoom,width,height);
-
-//let tiles=bboxToTiles(bb,zoom);
-
-downloadTiles('./tiles',bbox,zoom);
-
-// https://stackoverflow.com/questions/2853334/glueing-tile-images-together-using-imagemagicks-montage-command-without-resizing
-// montage tile*.jpg -tile 3x3 -geometry +0+0 output.jpg
-
-makeImages('./tiles', latitude, longitude, bbox, zoom);
-*/
-
-
-async function processGeojson(geo){
-
-    const width=512;
-    const height=512;
-    const zoom=17;
-    
-    let features=geo.features;
-    for(let i=0;i<features.length;i++){
-	const feature=features[i];
-	const id=feature.properties.id;
-	const lat=feature.geometry.coordinates[1];
-	const lon=feature.geometry.coordinates[0];
-
-	const bbox = latLngToBounds(lat, lon, zoom, width, height);
-
-	process.stderr.write(i+': '+id+'  ');
-	for(const layer of [ 'osm', 'esri' ])await downloadLayer('./tiles', layer, bbox, zoom);
-	//makeImages('./tiles', id, lat, lon, bbox, zoom);
-	
-    }
-}
-    
-
-var chunks = '';
-
-process.stdin.on('readable', () => {
-  let chunk;
-  while (null !== (chunk = process.stdin.read())) {
-      chunks+=chunk;
-  }
-});
-
-process.stdin.on('end', () => {
-    processGeojson(JSON.parse(chunks))
-});
-

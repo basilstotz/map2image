@@ -1,1 +1,1 @@
-# map2png
+# map2image

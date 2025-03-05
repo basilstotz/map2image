@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@mapbox/tilebelt": "^2.0.2",
     "jimp": "^1.6.0"
   }
 }
