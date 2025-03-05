@@ -1,4 +1,4 @@
-import { XYZTileset, latLonToPixel } from './xyztileset.mjs'
+import { XYZTileset  } from './xyztileset.mjs'
 
 
 let options= {
