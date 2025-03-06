@@ -132,7 +132,10 @@ export class XYZTileset{
 
     getPixelPosition(lat,lon){
 	//console.log(this.bbox);
-	return utils.latLonToPixel(lat, lon, this.bbox, this.zoom);
+	let pos = utils.latLonToPixel(lat, lon, this.bbox, this.zoom);
+	if(pos.x>this.image.width)pos.x=this.image.width;
+	if(pos.y>this.image.height)pos.y=this.image.height;
+	return pos
     }
     
     async writeImage(path){

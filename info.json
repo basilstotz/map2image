@@ -1,0 +1,12 @@
+{
+  "zoom": 12,
+  "bbox": {
+    "north": 47.6,
+    "south": 47.5,
+    "west": 7.5,
+    "east": 7.6
+  },
+  "template": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  "width": 292,
+  "height": 431
+}

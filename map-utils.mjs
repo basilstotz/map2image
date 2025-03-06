@@ -16,9 +16,20 @@ export const EARTH_CIR_METERS = 40075016.686;
 export function toRadians(degrees) {
   return degrees * Math.PI / 180;
 }
+
 export function toDegrees(radians) {
   return (radians / Math.PI) * 180
 }
+
+//tilebelt bbox
+export function tilebeltBboxToObject(bbox){
+    return { west: bbox[0], south: bbox[1], east: bbox[2], north: bbox[3] }
+}
+
+export function objectBboxToTilebelt(bbox){
+    return [ bbox.west, bbox.south, bbox.east, bbox.north ]
+}
+
 
 // coords to number  
 export function lon2tile(lon,zoom) {
@@ -86,32 +97,32 @@ export function isInBbox(lat,lon,bbox){
 
 
 export function calculateDistance(coord1, coord2) {
-  const { lat: lat1, lon: lon1 } = coord1;
-  const { lat: lat2, lon: lon2 } = coord2;
 
-  //const earthRadius = 6371; // Earth's radius in kilometers.
-  const earthRadius = EARTH_CIR_METERS / (2*Math.PI);
-  const lat1Rad = (lat1 * Math.PI) / 180;
-  const lon1Rad = (lon1 * Math.PI) / 180;
-  const lat2Rad = (lat2 * Math.PI) / 180;
-  const lon2Rad = (lon2 * Math.PI) / 180;
+    const { lat: lat1, lon: lon1 } = coord1;
+    const { lat: lat2, lon: lon2 } = coord2;
 
-  const dLat = lat2Rad - lat1Rad;
-  const dLon = lon2Rad - lon1Rad;
+    const lat1Rad = toRadians(lat1);
+    const lon1Rad = toRadians(lon1);
+    const lat2Rad = toRadians(lat2);
+    const lon2Rad = toRadians(lon2);
 
-  // Calculation using the haversine formula (the formula is divided into two parts).
+    const dLat = lat2Rad - lat1Rad;
+    const dLon = lon2Rad - lon1Rad;
 
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1Rad) *
-      Math.cos(lat2Rad) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    // Calculation using the haversine formula (the formula is divided into two parts).
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1Rad) *
+	Math.cos(lat2Rad) *
+	Math.sin(dLon / 2) *
+	Math.sin(dLon / 2);
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  const distance = earthRadius * c;
-    //return distance.toFixed(2); // The distance between two geographic points in meters rounded to the hundredths.
+    //const earthRadius = 6371; // Earth's radius in kilometers.
+    const earthRadius = EARTH_CIR_METERS / (2*Math.PI);
+    const distance = earthRadius * c;
+    // The distance between two geographic points in meters
     return distance;
 }
 
@@ -184,18 +195,6 @@ export function latLonToPixel(lat,lon,bbox, zoom){
     return { x: resX, y: resY }
 }
 
-export function tilebeltBboxToObject(bbox){
-    return { west: bbox[0], south: bbox[1], east: bbox[2], north: bbox[3] }
-}
-
-
-export function objectBboxToTilebelt(bbox){
-    return [ bbox.west, bbox.south, bbox.east, bbox.north ]
-}
-
-
-
-
 export function bboxToTiles(bbox,zoom){
     
     let top=lat2tile(bbox.north,zoom);
@@ -212,7 +211,6 @@ export function bboxToTiles(bbox,zoom){
     }
     return tiles;
 }
-
 
 export function bboxToDimension(bbox,zoom){
 
